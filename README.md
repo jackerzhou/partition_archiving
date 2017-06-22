@@ -70,3 +70,204 @@
 ```
 
 ### This tool was inspired by this work https://www.percona.com/live/mysql-conference-2013/sites/default/files/slides/discard_inport_exchange.pdf
+
+## Example:
+
+```
+run.sh:
+
+/go/bin/partition_archiving \
+        -source-db-host 192.168.0.232 \
+        -source-db-pass pass \
+        -source-ssh-pass pass \
+        -source-db-backup-name ISP_BKP4 \
+        -partition p201303 \
+        -destination-db-host 192.168.0.156 \
+        -destination-db-pass pass \
+        -destination-db-backup-name ISP_BKP3 \
+        -destination-db-name ISP_B \
+        -destination-ssh-pass pass \
+        -destination-datadir /export/db \
+        -tmp-table RAD_ACCT_TMP2 \
+        -smtp-password pass \
+        -smtp-recipient diegow@netlabs.com.ar \
+        -backup-host 192.168.0.156 \
+        -backup-ssh-pass pass \
+        $*
+
+./run.sh -partition p201305
+
+***************
+* Step 1
+***************
+
+@192.168.0.232: create database ISP_BKP4
+
+***************
+* Step 2
+***************
+
+show create table ISP.RAD_ACCT
+
+***************
+* Step 3
+***************
+
+@192.168.0.232: CREATE TABLE `ISP_BKP4`.`RAD_ACCT_TMP2_p201305` (
+  `RAD_ACCT_ID` bigint(20) NOT NULL AUTO_INCREMENT,
+  `ACCTSESSIONID` varchar(255) DEFAULT NULL,
+  `ACCTUNIQUEID` varchar(255) DEFAULT NULL,
+  `USERNAME` varchar(255) DEFAULT NULL,
+...
+  PRIMARY KEY (`RAD_ACCT_ID`,`ACCTSTARTTIME`),
+  KEY `IDX_ACCTSESSIONID` (`ACCTSESSIONID`),
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8
+
+
+***************
+* Step 4
+***************
+
+@192.168.0.232: alter table ISP.RAD_ACCT exchange partition p201305 with table ISP_BKP4.RAD_ACCT_TMP2_p201305
+
+***************
+* Step 5
+***************
+
+@192.168.0.156: create database ISP_BKP3
+
+***************
+* Step 6
+***************
+
+show create table ISP_B.RAD_ACCT
+
+***************
+* Step 7
+***************
+
+@192.168.0.156: CREATE TABLE `ISP_BKP3`.`RAD_ACCT_TMP2_p201305` (
+  `RAD_ACCT_ID` bigint(20) NOT NULL AUTO_INCREMENT,
+  `ACCTSESSIONID` varchar(255) DEFAULT NULL,
+  `ACCTUNIQUEID` varchar(255) DEFAULT NULL,
+  `USERNAME` varchar(255) DEFAULT NULL,
+...
+  PRIMARY KEY (`RAD_ACCT_ID`,`ACCTSTARTTIME`),
+  KEY `IDX_ACCTSESSIONID` (`ACCTSESSIONID`),
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8
+
+
+***************
+* Step 8
+***************
+
+@192.168.0.232: FLUSH TABLES ISP_BKP4.RAD_ACCT_TMP2_p201305 WITH READ LOCK
+
+***************
+* Step 9
+***************
+
+/usr/bin/scp root@192.168.0.232:/export/mysql/data/ISP_BKP4/RAD_ACCT_TMP2_p201305.* /tmp
+
+
+RAD_ACCT_TMP2_p201305.cfg                     100% 2504     2.5KB/s   00:00
+RAD_ACCT_TMP2_p201305.frm                     100%   22KB  21.5KB/s   00:00
+RAD_ACCT_TMP2_p201305.ibd                     100%   80MB  40.0MB/s   00:02
+***************
+* Step 10
+***************
+
+@192.168.0.156: alter table ISP_BKP3.RAD_ACCT_TMP2_p201305 discard tablespace
+
+***************
+* Step 11
+***************
+
+/usr/bin/ssh root@192.168.0.156 rm /export/db/ISP_BKP3/RAD_ACCT_TMP2_p201305.*
+
+
+***************
+* Step 12
+***************
+
+/usr/bin/scp /tmp/RAD_ACCT_TMP2_p201305.cfg /tmp/RAD_ACCT_TMP2_p201305.frm /tmp/RAD_ACCT_TMP2_p201305.ibd root@192.168.0.156:/export/db/ISP_BKP3
+
+
+RAD_ACCT_TMP2_p201305.cfg                     100% 2504     2.5KB/s   00:00
+RAD_ACCT_TMP2_p201305.frm                     100%   22KB  21.5KB/s   00:00
+RAD_ACCT_TMP2_p201305.ibd                     100%   80MB  13.3MB/s   00:06
+***************
+* Step 13
+***************
+
+/usr/bin/ssh root@192.168.0.156 chown mysql:mysql /export/db/ISP_BKP3/RAD_ACCT_TMP2_p201305.*
+
+
+***************
+* Step 14
+***************
+
+@192.168.0.156: alter table ISP_BKP3.RAD_ACCT_TMP2_p201305 import tablespace
+
+***************
+* Step 15
+***************
+
+@192.168.0.156: alter table ISP_B.RAD_ACCT exchange partition p201305 with table ISP_BKP3.RAD_ACCT_TMP2_p201305
+
+***************
+* Step 16
+***************
+
+@192.168.0.156: drop table ISP_BKP3.RAD_ACCT_TMP2_p201305
+
+***************
+* Step 17
+***************
+
+@192.168.0.156: drop database ISP_BKP3
+
+***************
+* Step 18
+***************
+
+@192.168.0.232: drop table ISP_BKP4.RAD_ACCT_TMP2_p201305
+
+***************
+* Step 19
+***************
+
+@192.168.0.232: drop database ISP_BKP4
+
+***************
+* Step 20
+***************
+
+tar czvvf RAD_ACCT_TMP2_p201305.tgz RAD_ACCT_TMP2_p201305.cfg RAD_ACCT_TMP2_p201305.frm RAD_ACCT_TMP2_p201305.ibd
+
+-rw-r----- root/root      2504 2017-06-22 15:25 RAD_ACCT_TMP2_p201305.cfg
+-rw-r----- root/root     22060 2017-06-22 15:25 RAD_ACCT_TMP2_p201305.frm
+-rw-r----- root/root  83886080 2017-06-22 15:25 RAD_ACCT_TMP2_p201305.ibd
+***************
+* Step 21
+***************
+
+/usr/bin/ssh root@192.168.0.156 if [ -f /export/db/RAD_ACCT/RAD_ACCT_TMP2_p201305.tgz ] ; then echo "file /export/db/RAD_ACCT/RAD_ACCT_TMP2_p201305.tgz already exists!!!!"; exit 1; fi
+
+
+***************
+* Step 22
+***************
+
+/usr/bin/scp /tmp/RAD_ACCT_TMP2_p201305.tgz root@192.168.0.156:/export/db/RAD_ACCT/
+
+
+RAD_ACCT_TMP2_p201305.tgz                     100%   21MB   1.2MB/s   00:18
+***************
+* Step 23
+***************
+
+/usr/bin/ssh root@192.168.0.156 chmod 400 /export/db/RAD_ACCT/RAD_ACCT_TMP2_p201305.tgz
+
+
+```
