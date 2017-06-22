@@ -60,10 +60,6 @@ func main() {
 
 	archive.stepNum = 0
 
-	//source := new(hostConfig)
-	//destination := new(hostConfig)
-	//smtpAlert := new(smtpConfig)
-
 	// Leo argumentos
 
 	flag.StringVar(&archive.source.dbHost, "source-db-host", "localhost", "Source DB Host")
