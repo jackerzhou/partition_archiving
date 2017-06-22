@@ -1,7 +1,7 @@
 # partition_archiving
 ## Archiving for MySQL partitions
 
-### partition_archiving is a tool to extract partitions from a MySQL partitioned table, move it to another database, and copy the files to a backup server.
+### partition_archiving is a tool written in golang to extract partitions from a MySQL partitioned table, move it to another database, and copy the files to a backup server.
 
 ```
  Usage of /go/bin/partition_archiving:
