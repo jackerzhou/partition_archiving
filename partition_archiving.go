@@ -8,7 +8,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"net/smtp"
-	_ "os"
 	"regexp"
 	"strconv"
 )
@@ -54,13 +53,13 @@ type archiveStruct struct {
 
 func main() {
 
-	// Definiciones
+	// Definitions
 
 	archive := new(archiveStruct)
 
 	archive.stepNum = 0
 
-	// Leo argumentos
+	// Read arguments
 
 	flag.StringVar(&archive.source.dbHost, "source-db-host", "localhost", "Source DB Host")
 	flag.StringVar(&archive.source.dbUser, "source-db-user", "root", "Source DB User")
@@ -108,34 +107,29 @@ func main() {
 
 	flag.Parse()
 
-	//sendMail(smtpAlert, "subject prueba", "body prueba")
-	//return
-
-	// Le sumo el nombre de la particion al nombre de la tabla temporal
+	// Add partition name to temporal table
 
 	archive.tmpTable += "_" + archive.partition
 
-	// Conecto a la DB Source
+	// Connect to DB Source
 
 	archive.sourceDb, archive.err = sql.Open("mysql", archive.source.dbUser+":"+archive.source.dbPass+"@tcp("+archive.source.dbHost+":3306)/"+archive.source.dbName+"?charset=utf8")
 	archive.checkErr("")
 
-	// Conecto a la DB Destination
+	// Connect to DB Destination
 
 	archive.destinationDb, archive.err = sql.Open("mysql", archive.destination.dbUser+":"+archive.destination.dbPass+"@tcp("+archive.destination.dbHost+":3306)/"+archive.destination.dbName+"?charset=utf8")
 	archive.checkErr("")
 
-	// Creo la base temporal en origen
+	// Create temp table in source db
 
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, "create database "+archive.source.dbBackupName)
 
-	// Crea la tabla temporal igual que la origen
+	// Creates the temporal table in source host as from source db, without partitions
 
 	var createTmpTable string
 	archive.getCreateTable(archive.sourceDb, archive.source.dbName, archive.source.dbTable, archive.source.dbBackupName, archive.tmpTable, &createTmpTable)
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, createTmpTable)
-
-	//os.Exit(0)
 
 	// Extraigo la particion que quiero archivar
 

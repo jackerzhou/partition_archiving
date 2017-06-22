@@ -68,3 +68,5 @@
   -tmp-table string
     	Temp table name (default "RAD_ACCT_TMP")
 ```
+
+### This tool was inspired by this work https://www.percona.com/live/mysql-conference-2013/sites/default/files/slides/discard_inport_exchange.pdf
