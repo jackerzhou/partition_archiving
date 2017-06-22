@@ -1,11 +1,11 @@
 # partition_archiving
-Archiving for MySQL partitions
+## Archiving for MySQL partitions
 
-partition_archiving is a tool to extract partitions from a MySQL partitioned table, move it to another database, and copy the files to a backup server.
+### partition_archiving is a tool to extract partitions from a MySQL partitioned table, move it to another database, and copy the files to a backup server.
 
-
-Usage of /go/bin/partition_archiving:
-  -backup-host string
+```
+ Usage of /go/bin/partition_archiving:
+   -backup-host string
     	Backup Host (default "localhost")
   -backup-path string
     	Backup Path (default "/export/db/RAD_ACCT")
@@ -67,3 +67,4 @@ Usage of /go/bin/partition_archiving:
     	Source SSH User (default "root")
   -tmp-table string
     	Temp table name (default "RAD_ACCT_TMP")
+```
