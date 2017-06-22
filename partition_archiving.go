@@ -131,101 +131,101 @@ func main() {
 	archive.getCreateTable(archive.sourceDb, archive.source.dbName, archive.source.dbTable, archive.source.dbBackupName, archive.tmpTable, &createTmpTable)
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, createTmpTable)
 
-	// Extraigo la particion que quiero archivar
+	// Extract the partition I want to archive
 
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, "alter table "+archive.source.dbName+"."+archive.source.dbTable+" exchange partition "+archive.partition+" with table "+archive.source.dbBackupName+"."+archive.tmpTable)
 
-	// Creo la base temporal en destino
+	// Create temporal DB at destination
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "create database "+archive.destination.dbBackupName)
 
-	// Crea la tabla temporal igual que la destinio
+	// Create the temporal table as in destination
 
 	archive.getCreateTable(archive.destinationDb, archive.destination.dbName, archive.destination.dbTable, archive.destination.dbBackupName, archive.tmpTable, &createTmpTable)
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, createTmpTable)
 
-	// Hago el flush table with read lock para que me deje los archivos listos para copiar
+	// flush table with read lock to leave the files ready to be copied, in this step de file .cfg is created, with unlock this file is deleted
 
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, "FLUSH TABLES "+archive.source.dbBackupName+"."+archive.tmpTable+" WITH READ LOCK")
 
-	// Copio los files de la tabla
+	// Copy table files
 
 	archive.runSshCmd("/usr/bin/scp "+archive.source.sshUser+"@"+archive.source.dbHost+":"+archive.source.dataDir+"/"+archive.source.dbBackupName+"/"+archive.tmpTable+".* /tmp", archive.source.sshPass)
 
-	// Desmonto el tablespace de la tabla destino
+	// Unmount tablespaces from destination table
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "alter table "+archive.destination.dbBackupName+"."+archive.tmpTable+" discard tablespace")
 
-	// Borro los files de la tabla temporal en destino
+	// Delete the temporal table files in destination
 
 	archive.runSshCmd("/usr/bin/ssh "+archive.destination.sshUser+"@"+archive.destination.dbHost+" rm "+archive.destination.dataDir+"/"+archive.destination.dbBackupName+"/"+archive.tmpTable+".*", archive.destination.sshPass)
 
-	// Copio los files de la tabla a destino
+	// Copy the table files to destination
 
 	archive.runSshCmd("/usr/bin/scp /tmp/"+archive.tmpTable+".cfg "+"/tmp/"+archive.tmpTable+".frm /tmp/"+archive.tmpTable+".ibd "+archive.destination.sshUser+"@"+archive.destination.dbHost+":"+archive.destination.dataDir+"/"+archive.destination.dbBackupName, archive.destination.sshPass)
 
-	// Cambio el ownership de los archivos copiados
+	// Change ownership of copied files
 
 	archive.runSshCmd("/usr/bin/ssh "+archive.destination.sshUser+"@"+archive.destination.dbHost+" chown mysql:mysql "+archive.destination.dataDir+"/"+archive.destination.dbBackupName+"/"+archive.tmpTable+".*", archive.destination.sshPass)
 
-	// Monto el tablespace con los files copiados
+	// Mount the tablespace using the copied files
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "alter table "+archive.destination.dbBackupName+"."+archive.tmpTable+" import tablespace")
 
-	// Reinserto la partiticion en la tabla de backup
+	// Reinserts the partition in the backup table
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "alter table "+archive.destination.dbName+"."+archive.destination.dbTable+" exchange partition "+archive.partition+" with table "+archive.destination.dbBackupName+"."+archive.tmpTable)
 
-	// Me desconecto de las bases
+	// Disconnect from dbs
 
 	archive.sourceDb.Close()
 	archive.destinationDb.Close()
 
-	// Comienzo procedimiento de purga de las tablas temporales de origen y destino
+	// Start purge procedure from temporal tables in source and destination
 
-	// Conecto a la DB Source
+	// Connect to source db
 
 	archive.sourceDb, archive.err = sql.Open("mysql", archive.source.dbUser+":"+archive.source.dbPass+"@tcp("+archive.source.dbHost+":3306)/"+archive.source.dbName+"?charset=utf8")
 	archive.checkErr("")
 
-	// Conecto a la DB Destination
+	// Connect to destination db
 
 	archive.destinationDb, archive.err = sql.Open("mysql", archive.destination.dbUser+":"+archive.destination.dbPass+"@tcp("+archive.destination.dbHost+":3306)/"+archive.destination.dbName+"?charset=utf8")
 	archive.checkErr("")
 
-	// Borro la tabla temporal de destino
+	// Delete temporal tables in destination
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "drop table "+archive.destination.dbBackupName+"."+archive.tmpTable)
 
-	// Borro la base temporal
+	// Delete temporal db in destination
 
 	archive.runSQL("@"+archive.destination.dbHost+": ", archive.destinationDb, "drop database "+archive.destination.dbBackupName)
 
-	// Borro la tabla temporal de origen
+	// Delete temporal table in source
 
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, "drop table "+archive.source.dbBackupName+"."+archive.tmpTable)
 
-	// Borro la base temporal de origen
+	// Delete temporal db in source
 
 	archive.runSQL("@"+archive.source.dbHost+": ", archive.sourceDb, "drop database "+archive.source.dbBackupName)
 
-	// Comprimo los archivos del tablespace
+	// Compress tablespace files
 
 	archive.runLocalCmd("tar czvvf " + archive.tmpTable + ".tgz " + archive.tmpTable + ".cfg " + archive.tmpTable + ".frm " + archive.tmpTable + ".ibd")
 
-	// Salgo si el archivo existe en el servidor de backup
+	// If the compressed file exists at backup server exit with error
 
 	archive.runSshCmd("/usr/bin/ssh "+archive.backupSshUser+"@"+archive.backupHost+" if [ -f "+archive.backupPath+"/"+archive.tmpTable+".tgz ] ; then echo \"file "+archive.backupPath+"/"+archive.tmpTable+".tgz already exists!!!!\"; exit 1; fi", archive.backupSshPass)
 
-	// Copio los files al servidor de backup
+	// Copy compressed files to backup db
 
 	archive.runSshCmd("/usr/bin/scp /tmp/"+archive.tmpTable+".tgz "+archive.backupSshUser+"@"+archive.backupHost+":"+archive.backupPath+"/", archive.backupSshPass)
 
-	// Hago los files read-only
+	// Make files read-only
 
 	archive.runSshCmd("/usr/bin/ssh "+archive.backupSshUser+"@"+archive.backupHost+" chmod 400 "+archive.backupPath+"/"+archive.tmpTable+".tgz", archive.backupSshPass)
 
-	// Me desconecto de las bases
+	// Disconnect from dbs
 
 	archive.sourceDb.Close()
 	archive.destinationDb.Close()
