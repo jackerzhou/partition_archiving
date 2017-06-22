@@ -221,7 +221,7 @@ func main() {
 
 	// Salgo si el archivo existe en el servidor de backup
 
-	archive.runSshCmd("/usr/bin/ssh "+archive.backupSshUser+"@"+archive.backupHost+" if [ -f "+archive.backupPath+"/"+archive.tmpTable+".tgz ] ; then echo \"file /export/db/RAD_ACCT/RAD_ACCT_TMP2_p201304.tgz already exists!!!!\"; exit 1; fi", archive.backupSshPass)
+	archive.runSshCmd("/usr/bin/ssh "+archive.backupSshUser+"@"+archive.backupHost+" if [ -f "+archive.backupPath+"/"+archive.tmpTable+".tgz ] ; then echo \"file "+archive.backupPath+"/"+archive.tmpTable+".tgz already exists!!!!\"; exit 1; fi", archive.backupSshPass)
 
 	// Copio los files al servidor de backup
 
