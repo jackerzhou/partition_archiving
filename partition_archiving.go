@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	gexpect "github.com/ThomasRooney/gexpect"
@@ -119,6 +120,11 @@ func main() {
 	// Connect to DB Destination
 
 	archive.destinationDb, archive.err = sql.Open("mysql", archive.destination.dbUser+":"+archive.destination.dbPass+"@tcp("+archive.destination.dbHost+":3306)/"+archive.destination.dbName+"?charset=utf8")
+	archive.checkErr("")
+
+	// Check if source partition is empty
+
+	archive.err = archive.checkEmptyPartition("@"+archive.source.dbHost+": ", archive.sourceDb, archive.source.dbName, archive.source.dbTable, archive.partition)
 	archive.checkErr("")
 
 	// Create temp table in source db
@@ -290,6 +296,29 @@ func (archive *archiveStruct) getCreateTable(db *sql.DB, dbName string, dbTable 
 		re = regexp.MustCompile("CREATE TABLE `" + dbTable + "`")
 		*sqlQuery = re.ReplaceAllString(*sqlQuery, "CREATE TABLE `"+dbBackupName+"`.`"+tmpTable+"`")
 	}
+}
+
+func (archive *archiveStruct) checkEmptyPartition(msg string, db *sql.DB, dbName string, dbTable string, partition string) error {
+	var rows *sql.Rows
+
+	cmd := "select * from " + dbName + "." + dbTable + " partition (" + partition + ") limit 1"
+
+	archive.stepNum++
+
+	if archive.stepNum < archive.fromStep {
+		archive.printBanner("Skipping: " + msg + cmd)
+		return nil
+	}
+
+	archive.printBanner(msg + cmd)
+
+	rows, archive.err = db.Query(cmd)
+	archive.checkErr("")
+
+	for rows.Next() {
+		return nil
+	}
+	return errors.New("Partition " + partition + " from " + dbName + "." + dbTable + " is not empty!!")
 }
 
 func (archive *archiveStruct) runSQL(msg string, db *sql.DB, sql string) {
