@@ -290,4 +290,4 @@ date -d "today - 12 month" "+%Y%m"
 
 So running the command would be like this:
 
-./run.sh -partition p`date -d "today - 12 month" "+%Y%m"`
+./run.sh -partition p\`date -d "today - 12 month" "+%Y%m"\`
