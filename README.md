@@ -276,4 +276,18 @@ RAD_ACCT_TMP2_p201305.tgz                     100%   21MB   1.2MB/s   00:18
 /usr/bin/ssh root@192.168.0.156 chmod 400 /export/db/RAD_ACCT/RAD_ACCT_TMP2_p201305.tgz
 
 
+
+In order to build partition string like YearMonth, from 12 months ago:
+
+date -d "today - 12 month" "+%Y%m"
+
+
 ```
+
+### In order to build partition string like YearMonth, from 12 months ago:
+
+date -d "today - 12 month" "+%Y%m"
+
+So running the command would be like this:
+
+./run.sh -partition p`date -d "today - 12 month" "+%Y%m"`

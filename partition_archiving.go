@@ -246,7 +246,7 @@ func (archive *archiveStruct) checkErr(msg string) {
 			msg = archive.lastCommand + "\n" + archive.err.Error()
 		}
 
-		archive.sendMail("Problema en el paso "+strconv.Itoa(archive.stepNum), msg)
+		archive.sendMail("Problem in step number "+strconv.Itoa(archive.stepNum), msg)
 		panic(archive.err)
 	}
 }
